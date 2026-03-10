@@ -258,7 +258,7 @@ def handle_update(update):
     if not is_admin and holat == "off":
         bot("sendMessage", {
             "chat_id": chat_id,
-            "text": "<b>🛠 Texnik xizmat davom etmoqda!\n\n▪ Bot maʼmuriyati ushbu bot ichida baʼzi texnik ishlarni olib bormoqda.\n▪ Shu sababdan menyu adminlar tomonidan oʻchirilgan va hozirda foydalanuvchilar uchun mavjud emas.\n▪ Barcha funksiyalar tugallangandan keyin tiklanadi.\n\n📝 Keyinroq qaytib keling va bot holatini tekshirish uchun /start tugmasini bosing!</b>",
+            "text": "<b>🛠 Texnik xizmat davom etmoqda!\n\n▪ Bot mamuriyati ushbu bot ichida baʼzi texnik ishlarni olib bormoqda.\n▪ Shu sababdan menyu adminlar tomonidan oʻchirilgan va hozirda foydalanuvchilar uchun mavjud emas.\n▪ Barcha funksiyalar tugallangandan keyin tiklanadi.\n\n📝 Keyinroq qaytib keling va bot holatini tekshirish uchun /start tugmasini bosing!</b>",
             "parse_mode": "html",
             "reply_markup": json.dumps({"remove_keyboard": True})
         })
