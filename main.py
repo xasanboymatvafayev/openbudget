@@ -37,6 +37,18 @@ def bot(method, steps=None):
         return None
 
 
+def bot_file(method, files=None, steps=None):
+    if steps is None:
+        steps = {}
+    url = BASE_URL + method
+    try:
+        response = requests.post(url, data=steps, files=files)
+        return response.json()
+    except Exception as e:
+        print(f"cURL error: {e}")
+        return None
+
+
 def read_file(path, default=""):
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -64,6 +76,30 @@ def ensure_dirs(cid):
     os.makedirs(f"step/{cid}", exist_ok=True)
 
 
+def send_vote_photo(cid, num, caption):
+    """Send vote example photo, cache file_id after first send"""
+    cache_path = f"data/vote_photo_{num}.txt"
+    cached = read_file(cache_path)
+    photo_path = f"vote{num}.jpg"
+
+    if cached.strip():
+        bot("sendPhoto", {
+            "chat_id": cid,
+            "photo": cached.strip(),
+            "caption": caption,
+            "parse_mode": "html"
+        })
+    elif os.path.exists(photo_path):
+        with open(photo_path, "rb") as f:
+            result = bot_file("sendPhoto",
+                files={"photo": f},
+                steps={"chat_id": cid, "caption": caption, "parse_mode": "html"}
+            )
+        if result and result.get("ok"):
+            file_id = result["result"]["photo"][-1]["file_id"]
+            write_file(cache_path, file_id)
+
+
 # =============================================
 # Keyboard definitions
 # =============================================
@@ -73,7 +109,7 @@ def get_home_keyboard(is_admin):
         return json.dumps({
             "resize_keyboard": True,
             "keyboard": [
-                [{"text": "🛅 Ovoz berish"}, {"text": "🛡️Telegram bot orqali ovoz berish"}],
+                [{"text": "🛅 Ovoz berish"}],
                 [{"text": "💳 Hisobim"}, {"text": "🔄 Pul yechib olish"}],
                 [{"text": "👨🏻‍💻 Boshqaruv paneli"}, {"text": "📊 Statistika"}],
             ]
@@ -178,7 +214,6 @@ def handle_update(update):
 
     ensure_dirs(cid)
 
-    # Create default files if missing
     if not os.path.exists(f"step/{cid}/money.txt"):
         write_file(f"step/{cid}/money.txt", "0")
     if not os.path.exists("data/paynet.txt"):
@@ -223,7 +258,7 @@ def handle_update(update):
     if not is_admin and holat == "off":
         bot("sendMessage", {
             "chat_id": chat_id,
-            "text": "<b>🛠 Texnik xizmat davom etmoqda!\n\n▪ Bot maʼmuriyati ushbu bot ichida baʼzi texnik ishlarni olib bormoqda.\n▪ Shu sababdan menyu adminlar tomonidan oʻchirilgan va hozirda foydalanuvchilar uchun mavjud emas.\n▪ Barcha funksiyalar tugallangandan keyin tiklanadi.\n\n🔰 Agar siz ushbu botning administratori boʻlsangiz, ushbu rejimni oʻchirib qoʻyishingiz mumkin!\n👉👨🏻‍💻 Boshqaruv paneli | ⚙ Bot sozlamalari.\n\n📝 Boshqalar uchun:\nℹ️ Keyinroq qaytib keling va bot holatini tekshirish uchun /start tugmasini bosing!</b>",
+            "text": "<b>🛠 Texnik xizmat davom etmoqda!\n\n▪ Bot maʼmuriyati ushbu bot ichida baʼzi texnik ishlarni olib bormoqda.\n▪ Shu sababdan menyu adminlar tomonidan oʻchirilgan va hozirda foydalanuvchilar uchun mavjud emas.\n▪ Barcha funksiyalar tugallangandan keyin tiklanadi.\n\n📝 Keyinroq qaytib keling va bot holatini tekshirish uchun /start tugmasini bosing!</b>",
             "parse_mode": "html",
             "reply_markup": json.dumps({"remove_keyboard": True})
         })
@@ -232,7 +267,6 @@ def handle_update(update):
     # Channel subscription check
     if message and channel == "true":
         ids = [i for i in kanal.split("\n") if i.strip()]
-        soni = kanal.count("@")
         keyboards = []
         for i, ch_id in enumerate(ids[1:], start=1):
             ch_clean = ch_id.replace("@", "")
@@ -264,12 +298,12 @@ def handle_update(update):
         })
 
     # =============================================
-    # Voting section
+    # Voting — Telegram orqali ovoz berish O'CHIRILDI
     # =============================================
     if text == "🛅 Ovoz berish":
         bot("sendMessage", {
             "chat_id": cid,
-            "text": f"<b>\n\n🙋‍♂️ Ovoz belish uchun silka: {silka}</b>",
+            "text": f"<b>🙋‍♂️ Ovoz berish uchun havola:\n{silka}</b>",
             "parse_mode": "html",
             "reply_markup": home
         })
@@ -279,9 +313,12 @@ def handle_update(update):
             "parse_mode": "html",
             "reply_markup": home
         })
+        # Namuna skrinshtolar
+        send_vote_photo(cid, 1, "<b>1️⃣ SMS kodni tasdiqlash sahifasi — shu ko'rinishda skrinshot oling</b>")
+        send_vote_photo(cid, 2, "<b>2️⃣ Ovoz qabul qilindi sahifasi — shu ko'rinishda skrinshot oling</b>")
         bot("sendMessage", {
             "chat_id": cid,
-            "text": f"<b>⚠️ eslatma ovoz beriyotganda sekrenshot qiling! keyin esa '🙋‍♂️ Ovoz berdim' tugmasini bosib sekrenshot qilgan rasmingizni yuboring admin rasmni ko'rib tasdiqlasa hisobingizga {paynet} so'm pul qo'shiladi!</b>",
+            "text": f"<b>⚠️ Eslatma: Ovoz berganingizdan so'ng yuqoridagi 2 xil ko'rinishdagi skrinshotni yuboring!\n\n'🙋‍♂️ Ovoz berdim' tugmasini bosib ikkala skrinshotni yuboring — admin tasdiqlasa hisobingizga {paynet} so'm pul qo'shiladi!</b>",
             "parse_mode": "html",
             "reply_markup": ovoz_yes_kb
         })
@@ -289,7 +326,7 @@ def handle_update(update):
     if text == "🙋‍♂️ Ovoz berdim":
         bot("sendMessage", {
             "chat_id": cid,
-            "text": f"<b>✅️ Yaxshi endi ovoz berganligingizni tashdiqlash uchun sekrenshotga olgan rasmingizni tashlang!\n\nAdmin tasdiqlasa hisobingizga {paynet} so'm pul tushuriladi va siz telefon raqamingizga paynet qilib olishingiz mumkin.</b>",
+            "text": f"<b>✅️ Yaxshi! Endi ovoz berganligingizni tasdiqlash uchun 2 ta skrinshotni yuboring:\n\n1️⃣ SMS kodni tasdiqlash sahifasi\n2️⃣ Ovoz qabul qilindi sahifasi\n\nAdmin tasdiqlasa hisobingizga {paynet} so'm pul tushuriladi.</b>",
             "parse_mode": "html",
             "reply_markup": ortga_kb
         })
@@ -298,7 +335,7 @@ def handle_update(update):
     if photo and step == "ovoz_yes":
         bot("sendMessage", {
             "chat_id": cid,
-            "text": f"<b>Rasm adminga yuborildi admin tasdiqlasa hisobingizga {paynet} so'm tashlanadi!</b>",
+            "text": f"<b>Rasm adminga yuborildi! Admin tasdiqlasa hisobingizga {paynet} so'm tashlanadi!</b>",
             "parse_mode": "html",
             "reply_markup": home
         })
@@ -310,12 +347,12 @@ def handle_update(update):
         })
         yes_data = read_file("data/yes.txt")
         if uid in yes_data:
-            oo = "ushbu foydalanuvchi aval ovoz bergan"
+            oo = "ushbu foydalanuvchi avval ovoz bergan"
         else:
             oo = "ushbu foydalanuvchi ovoz bermagan"
         bot("sendMessage", {
             "chat_id": administrator,
-            "text": f"<b>👥 <a href='tg://user?id={cid}'>{name}</a> oydalanovchi ovoz berganlihi haqida ariza berdi!\n\nOvoz bergan bulsa <code>/berdi1 {cid}</code> buyrug'ini botga yuboring va uni hisobiga {paynet} so'm o'tkaziladi.\n\n♨️ {oo}\n⏰ Soat: {time_str} | 📆 Sana: {date_str}</b>",
+            "text": f"<b>👥 <a href='tg://user?id={cid}'>{name}</a> foydalanuvchi ovoz berganligihaqida ariza berdi!\n\nOvoz bergan bo'lsa <code>/berdi1 {cid}</code> buyrug'ini yuboring — hisobiga {paynet} so'm o'tkaziladi.\n\n♨️ {oo}\n⏰ Soat: {time_str} | 📆 Sana: {date_str}</b>",
             "parse_mode": "html",
             "reply_markup": home
         })
@@ -329,21 +366,13 @@ def handle_update(update):
         write_file(f"step/{target_id}/money.txt", str(new_balance))
         bot("sendMessage", {
             "chat_id": target_id,
-            "text": f"<b>✅️ Hurmatli foydalanuvchi adminga yuborgan arizangiz tasdiqlandi va sizning hisobingizga {paynet} so'm tushurildi!\n\n⏰ Soat: {time_str} | 📆 Sana: {date_str}</b>",
+            "text": f"<b>✅️ Hurmatli foydalanuvchi arizangiz tasdiqlandi va hisobingizga {paynet} so'm tushurildi!\n\n⏰ Soat: {time_str} | 📆 Sana: {date_str}</b>",
             "parse_mode": "html",
             "reply_markup": home
         })
         bot("sendMessage", {
             "chat_id": administrator,
             "text": f"<b>👥 Foydalanuvchi hisobiga {paynet} so'm qo'shildi!\n⏰ Soat: {time_str} | 📆 Sana: {date_str}</b>",
-            "parse_mode": "html",
-            "reply_markup": home
-        })
-
-    if text == "🛡️Tg bot orqali ovoz berish":
-        bot("sendMessage", {
-            "chat_id": cid,
-            "text": "<b>Telegram bit orqali ovoz bersa ham bo'ladi marhamat pastdagi silka orqali botga kirib start bosasiz va ro'yhatdan utgach ovoz berasiz...\nhttps://t.me/UzProDev</b>",
             "parse_mode": "html",
             "reply_markup": home
         })
@@ -360,22 +389,25 @@ def handle_update(update):
         })
 
     # =============================================
-    # Withdrawal
+    # Withdrawal — karta raqami ham qabul qilinadi
     # =============================================
     if text == "🔄 Pul yechib olish":
         bot("sendMessage", {
             "chat_id": cid,
-            "text": f"<b>👉 Pul yechib olish uchun iltimos Telefon raqamni kiriting.\n\nTel raqam uchun namuna: +998931234567\nKarta uchun namuna: 1101 1223 3445 8566\n</b>\n\nℹ️ <i>Minimal pul yechish miqdori: {minimal} so'm</i>",
+            "text": f"<b>👉 Pul yechib olish uchun telefon raqam yoki karta raqamini kiriting.\n\nTel raqam namunasi: +998931234567\nKarta namunasi: 1101122334458566\n</b>\n\nℹ️ <i>Minimal pul yechish miqdori: {minimal} so'm</i>",
             "parse_mode": "html",
             "reply_markup": ortga_kb
         })
         write_file(f"step/{cid}/{cid}.txt", "money_yech")
 
     if step == "money_yech":
-        if "+998" in text:
+        clean_text = text.replace(" ", "")
+        is_phone = text.startswith("+998") and len(text) >= 13
+        is_card = clean_text.isdigit() and len(clean_text) == 16
+        if is_phone or is_card:
             bot("sendMessage", {
                 "chat_id": cid,
-                "text": f"<b>👉 Pul yechib olish uchun pul miqdorini kiriting.</b>\n\nℹ️ <i>Minimal pul yechish miqdori: {minimal} so'm</i>",
+                "text": f"<b>👉 Pul yechib olish uchun miqdorni kiriting.</b>\n\nℹ️ <i>Minimal pul yechish miqdori: {minimal} so'm</i>",
                 "parse_mode": "html",
                 "reply_markup": ortga_kb
             })
@@ -384,7 +416,7 @@ def handle_update(update):
         else:
             bot("sendMessage", {
                 "chat_id": cid,
-                "text": f"<b>❌️ Nomer xato kiritildi! Boshqatdan kiriting! agarda botdagi hatollikni kurgan bolsangiz yoki kamchliklarni kurgan bolsangiz adminga murojaatn qilishingizni iltimos qilib qolamiz @UzProDev</b>\n\nℹ️ <i>Minimal pul yechish miqdori: {minimal} so'm</i>",
+                "text": f"<b>❌️ Noto'g'ri kiritildi! Qayta kiriting.\n\nTel raqam namunasi: +998931234567\nKarta namunasi: 1101122334458566</b>\n\nℹ️ <i>Minimal pul yechish miqdori: {minimal} so'm</i>",
                 "parse_mode": "html",
                 "reply_markup": ortga_kb
             })
@@ -401,7 +433,7 @@ def handle_update(update):
             })
             bot("sendMessage", {
                 "chat_id": administrator,
-                "text": f"<b>👥 <a href='tg://user?id={cid}'>{name}</a> obunachi pul yechib olish haqida ariza berdi!\n\n🔔 Pul miqdori: {text}\n\n⏳️ Telefon raqami: {num}\n\n✅️ Pul tashlab bergan bo'lsangiz <code>/pulyes {cid}</code> buyrug'ini botga yuboring va unga habar beriladi.\n\n⏰ Soat: {time_str} | 📆 Sana: {date_str}</b>",
+                "text": f"<b>👥 <a href='tg://user?id={cid}'>{name}</a> pul yechib olish haqida ariza berdi!\n\n🔔 Pul miqdori: {text} so'm\n\n⏳️ Raqam: {num}\n\n✅️ Pul tashlab bergan bo'lsangiz <code>/pulyes {cid}</code> yuboring.\n\n⏰ Soat: {time_str} | 📆 Sana: {date_str}</b>",
                 "parse_mode": "html",
                 "reply_markup": home
             })
@@ -409,7 +441,7 @@ def handle_update(update):
         else:
             bot("sendMessage", {
                 "chat_id": cid,
-                "text": f"<b>⚠️ Kechirasiz, ayriboshlash uchun hisob yetarli emas.</b>\n\nℹ️ <i>Minimal pul yechish miqdori: {minimal} so'm</i>",
+                "text": f"<b>⚠️ Kechirasiz, hisob yetarli emas yoki miqdor noto'g'ri.</b>\n\nℹ️ <i>Minimal: {minimal} so'm | Hisobingizda: {money} so'm</i>",
                 "parse_mode": "html",
                 "reply_markup": ortga_kb
             })
@@ -420,13 +452,13 @@ def handle_update(update):
         write_file("data/yes.txt", yes_data + "\n" + target_id)
         bot("sendMessage", {
             "chat_id": target_id,
-            "text": f"<b>✅️ Hurmatli foydalanuvchi adminga yuborgan arizangiz tasdiqlandi sizning raqamingizga pul tashlandi.\n\n⏰ Soat: {time_str} | 📆 Sana: {date_str}</b>",
+            "text": f"<b>✅️ Hurmatli foydalanuvchi arizangiz tasdiqlandi, raqamingizga pul tashlandi.\n\n⏰ Soat: {time_str} | 📆 Sana: {date_str}</b>",
             "parse_mode": "html",
             "reply_markup": home
         })
         bot("sendMessage", {
             "chat_id": administrator,
-            "text": f"<b>👥 Foydalanuvchiga pul tashlaganingiz haqida xabar berildi\n⏰ Soat: {time_str} | 📆 Sana: {date_str}</b>",
+            "text": f"<b>👥 Foydalanuvchiga pul tashlaganingiz haqida xabar berildi.\n⏰ Soat: {time_str} | 📆 Sana: {date_str}</b>",
             "parse_mode": "html",
             "reply_markup": home
         })
@@ -540,7 +572,7 @@ def handle_update(update):
         soni = kanal.count("@")
         bot("sendMessage", {
             "chat_id": cid,
-            "text": f"<b>📡 Kanalni oʻchirish uchun kanal havolasini yuboring!\n\n🔰 Masalan: @UzCoderTeam\n\n👇 Botga ulangan kanallar:\n{kanal}\n\n📝 Jami kanallar soni: {soni} ta\n</b>",
+            "text": f"<b>📡 Kanalni oʻchirish uchun kanal havolasini yuboring!\n\n🔰 Masalan: @UzCoderTeam\n\n👇 Botga ulangan kanallar:\n{kanal}\n\n📝 Jami kanallar soni: {soni} ta</b>",
             "parse_mode": "html",
             "reply_markup": ortga_kb
         })
@@ -888,7 +920,7 @@ def handle_update(update):
             write_file("data/paynet.txt", text)
             bot("sendMessage", {
                 "chat_id": cid,
-                "text": "<b>📝 🙋‍♂️ Ovoz berish narxini uzgartirildi</b>",
+                "text": "<b>📝 Ovoz berish narxi muvaffaqiyatli uzgartirildi!</b>",
                 "parse_mode": "html",
                 "reply_markup": panel_kb
             })
@@ -905,14 +937,6 @@ def handle_update(update):
 # =============================================
 # Webhook entry point (Flask)
 # =============================================
-# To run this bot, install dependencies:
-#   pip install flask requests pytz
-#
-# Then set webhook:
-#   https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://yourdomain.com/webhook
-#
-# Run with:
-#   python bot.py
 
 from flask import Flask, request
 
