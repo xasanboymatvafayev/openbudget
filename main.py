@@ -163,7 +163,7 @@ blok_manager_kb = json.dumps({
     "resize_keyboard": True,
     "keyboard": [
         [{"text": "✅ Blokdan olish"}, {"text": "❌ Bloklash"}],
-        [{"text": "📋 Bloklanganlar roʻyxati"}, {"text": "📋 Bloklanganlar roʻyxatini oʻchirish"}],
+        [{"text": "📋 Bloklanganlar roʻyxati"}, {"text": "📋 Bloklanganlar roʻyxatini ochirish"}],
         [{"text": "👨🏻‍💻 Boshqaruv paneli"}],
     ]
 })
